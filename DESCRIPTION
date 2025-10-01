@@ -12,21 +12,50 @@ Authors@R:
            role = c("aut"),
            email = "hessner@gmail.com",
            comment = c(ORCID = "0000-0003-0895-5576")))
-Description: This interface provides a set of methods to analyze
-    data for value-based gaze experiments.
+Description: Processes and analyzes eye-tracking data from EyeLink 1000 Plus
+    (remote mode) experiments. Ingests MATLAB .mat files and ASC files,
+    applies calibration offsets, computes zone-of-uncertainty metrics,
+    binarizes gaze into on/off-task indicators, and performs model-free
+    and model-based analyses with behavioral integration.
 License: MIT + file LICENSE.md
+URL: https://github.com/aridyckovsky/itrackvalr
+BugReports: https://github.com/aridyckovsky/itrackvalr/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.1.1
+RoxygenNote: 7.3.2
+Depends: 
+    R (>= 4.5.0)
 Imports:
+    broom,
+    broom.mixed,
+    cli,
     config,
-    tidyverse,
-    ggpubr,
-    magrittr,
-    targets,
-    tarchetypes,
+    dplyr,
+    fs,
+    ggplot2,
     here,
-    matlabr,
     lme4,
-    lmerTest
+    lmerTest,
+    magrittr,
+    R.matlab,
+    readr,
+    rlang,
+    stringr,
+    tarchetypes,
+    targets,
+    tibble,
+    tidyr
+Suggests:
+    covr,
+    eyetrackingR,
+    ggpubr,
+    glmmTMB,
+    knitr,
+    pkgdown,
+    rmarkdown,
+    saccadr,
+    testthat (>= 3.0.0),
+    vdiffr
+VignetteBuilder: knitr
+Config/testthat/edition: 3
