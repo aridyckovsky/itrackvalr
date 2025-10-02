@@ -23,16 +23,21 @@ library(targets)
 library(cli)
 
 # Main function
-run_itrackvalr_pipeline <- function(script = "_targets.R", 
+run_itrackvalr_pipeline <- function(data_dir = "inst/extdata/synthetic",
+                                     script = "_targets.R", 
                                      callr_function = NULL,
                                      clean_start = FALSE) {
   
   cli_h1("itrackvalr Pipeline Runner")
   
+  # Set data directory as environment variable for targets
+  Sys.setenv(ITRACKVALR_DATA_DIR = data_dir)
+  cli_alert_info("Data directory: {.path {data_dir}}")
+  
   # Optionally clean previous run
   if (clean_start) {
     cli_alert_info("Cleaning previous pipeline run...")
-    tar_destroy()
+    tar_destroy(destroy = "all")
     if (dir.exists("output")) {
       unlink("output", recursive = TRUE)
       cli_alert_success("Removed old output directory")
