@@ -1,0 +1,168 @@
+name: R-CMD-check
+
+on:
+  push:
+    branches: [main, refactor/2025-revival]
+  pull_request:
+    branches: [main, refactor/2025-revival]
+
+permissions: read-all
+
+jobs:
+  # Step 1: Generate synthetic test data (reusable workflow)
+  generate-data:
+    uses: ./.github/workflows/generate-synthetic-data.yml
+
+  # Step 2: Comprehensive R package checks
+  check:
+    needs: generate-data
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.os }} (R-${{ matrix.config.r }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: ubuntu-latest, r: 'release'}
+          - {os: ubuntu-latest, r: 'devel'}
+          - {os: macos-latest, r: 'release'}
+          - {os: windows-latest, r: 'release'}
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      ITRACKVALR_DATA_DIR: inst/extdata/synthetic
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download synthetic data
+        uses: actions/download-artifact@v4
+        with:
+          name: synthetic-data
+          path: inst/extdata/synthetic/
+
+      - name: Setup Pandoc
+        uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+
+      - name: Setup renv
+        uses: r-lib/actions/setup-renv@v2
+
+      - name: Validate DESCRIPTION and NAMESPACE
+        run: |
+          Rscript -e "
+          # Check DESCRIPTION
+          if (!file.exists('DESCRIPTION')) stop('DESCRIPTION missing')
+          desc <- read.dcf('DESCRIPTION')
+          cat('✓ Package:', desc[,'Package'], 'v', desc[,'Version'], '\n')
+          
+          # Check NAMESPACE is current
+          roxygen2::roxygenise()
+          if (system('git diff --quiet NAMESPACE man/') != 0) {
+            warning('NAMESPACE/man may be out of sync - run roxygen2::roxygenise()')
+          }
+          "
+
+      - name: Validate targets pipeline
+        run: |
+          Rscript -e "
+          targets::tar_validate()
+          cat('✓ Targets pipeline structure valid\n')
+          targets::tar_manifest()
+          cat('✓ Targets manifest generated\n')
+          "
+
+      - name: Run targets pipeline (quick test)
+        if: matrix.config.os == 'ubuntu-latest' && matrix.config.r == 'release'
+        run: |
+          Rscript -e "
+          source('run_pipeline.R')
+          run_itrackvalr_pipeline(data_dir = 'inst/extdata/synthetic', clean_start = TRUE)
+          
+          # Verify outputs
+          if (!file.exists('output/MANIFEST.csv')) {
+            stop('Pipeline did not create MANIFEST.csv')
+          }
+          cat('✓ Pipeline executed successfully\n')
+          "
+
+      - name: Run R CMD check
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
+          error-on: '"error"'
+
+  # Step 3: Test coverage (only on Ubuntu release)
+  coverage:
+    needs: generate-data
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download synthetic data
+        uses: actions/download-artifact@v4
+        with:
+          name: synthetic-data
+          path: inst/extdata/synthetic/
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-renv@v2
+
+      - name: Test coverage
+        run: |
+          Rscript -e "
+          cov <- covr::package_coverage(quiet = FALSE, clean = FALSE)
+          print(cov)
+          covr::to_cobertura(cov)
+          
+          # Get coverage percentage
+          pct <- covr::percent_coverage(cov)
+          cat('\n✓ Test coverage:', round(pct, 1), '%\n')
+          
+          if (pct < 70) {
+            warning('Coverage below 70% - consider adding more tests')
+          }
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./cobertura.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # Step 4: Summary
+  check-success:
+    needs: [generate-data, check, coverage]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          if [ "${{ needs.check.result }}" != "success" ]; then
+            echo "❌ R CMD check failed"
+            exit 1
+          fi
+          
+          if [ "${{ needs.coverage.result }}" != "success" ] && [ "${{ needs.coverage.result }}" != "skipped" ]; then
+            echo "⚠️  Coverage job failed (non-critical)"
+          fi
+          
+          echo "✅ All R package checks passed!"

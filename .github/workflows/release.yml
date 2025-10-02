@@ -1,0 +1,199 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release Package
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Setup renv
+        uses: r-lib/actions/setup-renv@v2
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine version bump from conventional commits
+        id: version
+        run: |
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Last tag: $LAST_TAG"
+          
+          # Get commit messages since last tag
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s")
+          echo "Commits since last tag:"
+          echo "$COMMITS"
+          
+          # Read current version from DESCRIPTION
+          CURRENT_VERSION=$(grep "^Version:" DESCRIPTION | sed 's/Version: //')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Parse version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          # Determine bump type based on conventional commits
+          BUMP_TYPE="none"
+          
+          # Check for breaking changes (BREAKING CHANGE or ! in commit)
+          if echo "$COMMITS" | grep -qE "^[a-z]+(\(.+\))?!:|BREAKING CHANGE:"; then
+            BUMP_TYPE="major"
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          # Check for new features (feat:)
+          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+            BUMP_TYPE="minor"
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          # Check for fixes (fix:)
+          elif echo "$COMMITS" | grep -qE "^fix(\(.+\))?:"; then
+            BUMP_TYPE="patch"
+            PATCH=$((PATCH + 1))
+          fi
+          
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          
+          echo "Bump type: $BUMP_TYPE"
+          echo "New version: $NEW_VERSION"
+          
+          # Set outputs
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update DESCRIPTION version
+        if: steps.version.outputs.bump_type != 'none'
+        run: |
+          Rscript -e "
+          desc::desc_set_version('${{ steps.version.outputs.new_version }}')
+          cat('Updated DESCRIPTION to version ${{ steps.version.outputs.new_version }}\n')
+          "
+
+      - name: Update documentation
+        if: steps.version.outputs.bump_type != 'none'
+        run: |
+          Rscript -e "roxygen2::roxygenise()"
+
+      - name: Generate changelog
+        if: steps.version.outputs.bump_type != 'none'
+        run: |
+          # Create/update NEWS.md
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          DATE=$(date +%Y-%m-%d)
+          
+          # Get commits since last tag, formatted
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Create changelog entry
+          {
+            echo "# itrackvalr $NEW_VERSION ($DATE)"
+            echo ""
+            
+            # Breaking changes
+            BREAKING=$(echo "$COMMITS" | grep -E "^- [a-z]+(\(.+\))?!:|BREAKING CHANGE:" || true)
+            if [ -n "$BREAKING" ]; then
+              echo "## ⚠️ BREAKING CHANGES"
+              echo ""
+              echo "$BREAKING"
+              echo ""
+            fi
+            
+            # Features
+            FEATURES=$(echo "$COMMITS" | grep "^- feat" || true)
+            if [ -n "$FEATURES" ]; then
+              echo "## ✨ Features"
+              echo ""
+              echo "$FEATURES"
+              echo ""
+            fi
+            
+            # Bug fixes
+            FIXES=$(echo "$COMMITS" | grep "^- fix" || true)
+            if [ -n "$FIXES" ]; then
+              echo "## 🐛 Bug Fixes"
+              echo ""
+              echo "$FIXES"
+              echo ""
+            fi
+            
+            # Other changes
+            OTHER=$(echo "$COMMITS" | grep -vE "^- (feat|fix|docs|style|refactor|test|chore)" || true)
+            if [ -n "$OTHER" ]; then
+              echo "## 📦 Other Changes"
+              echo ""
+              echo "$OTHER"
+              echo ""
+            fi
+            
+            # Add previous NEWS.md content if it exists
+            if [ -f NEWS.md ]; then
+              echo "---"
+              echo ""
+              cat NEWS.md
+            fi
+          } > NEWS.md.new
+          
+          mv NEWS.md.new NEWS.md
+          echo "Generated changelog for version $NEW_VERSION"
+
+      - name: Build R package
+        if: steps.version.outputs.bump_type != 'none'
+        run: |
+          R CMD build .
+          echo "package_file=itrackvalr_${{ steps.version.outputs.new_version }}.tar.gz" >> $GITHUB_ENV
+
+      - name: Commit version bump
+        if: steps.version.outputs.bump_type != 'none'
+        run: |
+          git add DESCRIPTION man/ NAMESPACE NEWS.md
+          git commit -m "chore(release): bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          git push origin main
+          # Tag the release
+          git tag "v${{ steps.version.outputs.new_version }}"
+          git push origin "v${{ steps.version.outputs.new_version }}"
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.bump_type != 'none'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.new_version }}
+          name: Release v${{ steps.version.outputs.new_version }}
+          body_path: NEWS.md
+          files: ${{ env.package_file }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
+      - name: No release needed
+        if: steps.version.outputs.bump_type == 'none'
+        run: |
+          echo "ℹ️  No conventional commits found that trigger a release"
+          echo "   Commits must start with: feat:, fix:, or contain BREAKING CHANGE:"

@@ -1,0 +1,122 @@
+# Tests for clock hand dynamics functions
+
+describe("derive_hand_dynamics()", {
+  
+  test_that("derive_hand_dynamics() computes hand positions", {
+    mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
+    
+    hand_positions <- derive_hand_dynamics(
+      metadata_df = mat_data$metadata,
+      events_df = mat_data$events,
+      cfg = config::get(),
+      sampling_rate_hz = 500
+    )
+    
+    expect_s3_class(hand_positions, "tbl_df")
+    expect_named(hand_positions, c("id", "t", "angle_deg", "tip_x_px", "tip_y_px", 
+                                    "center_x_px", "center_y_px"))
+    
+    # Should have many time points
+    expect_true(nrow(hand_positions) > 1000)
+  })
+  
+  test_that("derive_hand_dynamics() angles are in valid range", {
+    mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
+    
+    hand_positions <- derive_hand_dynamics(
+      mat_data$metadata,
+      mat_data$events,
+      config::get()
+    )
+    
+    # Angles should be 0-360
+    expect_true(all(hand_positions$angle_deg >= 0))
+    expect_true(all(hand_positions$angle_deg < 360))
+  })
+  
+  test_that("derive_hand_dynamics() tip positions are on screen", {
+    mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
+    cfg <- config::get()
+    
+    hand_positions <- derive_hand_dynamics(
+      mat_data$metadata,
+      mat_data$events,
+      cfg
+    )
+    
+    # Tip should be within reasonable bounds (may exceed screen slightly)
+    expect_true(all(hand_positions$tip_x_px > 0))
+    expect_true(all(hand_positions$tip_y_px > 0))
+    expect_true(all(hand_positions$tip_x_px < cfg$screen$width_px * 1.5))
+    expect_true(all(hand_positions$tip_y_px < cfg$screen$height_px * 1.5))
+  })
+  
+  test_that("derive_hand_dynamics() center depends on clock_side", {
+    mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
+    cfg <- config::get()
+    
+    hand_positions <- derive_hand_dynamics(
+      mat_data$metadata,
+      mat_data$events,
+      cfg
+    )
+    
+    # Center depends on clock_side (task.m lines 260-271)
+    # lr=0 (LEFT): X = screen_width/2 - screen_width/4 = width/4
+    # lr=1 (RIGHT): X = screen_width/2 + screen_width/4 = 3*width/4
+    # Y always at screen_height/2
+    clock_side <- mat_data$metadata$clock_side
+    
+    if (clock_side == 0) {
+      expected_center_x <- cfg$screen$width_px / 4  # LEFT: 320
+    } else {
+      expected_center_x <- cfg$screen$width_px * 3 / 4  # RIGHT: 960
+    }
+    expected_center_y <- cfg$screen$height_px / 2
+    
+    expect_equal(unique(hand_positions$center_x_px), expected_center_x)
+    expect_equal(unique(hand_positions$center_y_px), expected_center_y)
+  })
+  
+})
+
+describe("join_hand_positions()", {
+  
+  test_that("join_hand_positions() adds hand columns to samples", {
+    mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
+    
+    hand_positions <- derive_hand_dynamics(
+      mat_data$metadata,
+      mat_data$events,
+      config::get()
+    )
+    
+    samples_with_hand <- join_hand_positions(
+      mat_data$samples[1:500, ],
+      hand_positions
+    )
+    
+    expect_true("tip_x_px" %in% names(samples_with_hand))
+    expect_true("tip_y_px" %in% names(samples_with_hand))
+    expect_true("angle_deg" %in% names(samples_with_hand))
+    expect_true("center_x_px" %in% names(samples_with_hand))
+    expect_true("center_y_px" %in% names(samples_with_hand))
+  })
+  
+  test_that("join_hand_positions() preserves all sample rows", {
+    mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
+    
+    hand_positions <- derive_hand_dynamics(
+      mat_data$metadata,
+      mat_data$events,
+      config::get()
+    )
+    
+    samples_subset <- mat_data$samples[1:500, ]
+    samples_with_hand <- join_hand_positions(samples_subset, hand_positions)
+    
+    expect_equal(nrow(samples_with_hand), nrow(samples_subset))
+  })
+  
+})
+

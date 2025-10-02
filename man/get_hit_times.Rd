@@ -15,3 +15,4 @@ Get hit timestamp from a vector of signal times and a vector of response times
 \note{
 Use the .interval variable if 8 seconds is not the desired interval
 }
+\keyword{internal}

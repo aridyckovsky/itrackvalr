@@ -1,6 +1,6 @@
 #' @title Model participant hits by signal time
 #' @description TODO
-#' @export
+#' @keywords internal
 hit_by_signal_time_model <- function(df, random_effects = FALSE) {
   if (random_effects) {
     glmer(
@@ -19,7 +19,7 @@ hit_by_signal_time_model <- function(df, random_effects = FALSE) {
 
 #' @title Model participant reaction time by signal time
 #' @description TODO
-#' @export
+#' @keywords internal
 reaction_time_by_signal_time_model <- function(df, random_effects = FALSE) {
   if (random_effects) {
     lmer(
@@ -36,7 +36,7 @@ reaction_time_by_signal_time_model <- function(df, random_effects = FALSE) {
 
 #' @title Model participant false alarms by response time
 #' @description TODO
-#' @export
+#' @keywords internal
 false_alarm_by_response_time_model <- function(df, random_effects = FALSE) {
   if (random_effects) {
     glmer(

@@ -10,3 +10,4 @@ get_behavioral_metadata(behavioral_data)
 Creates a dataframe composed of each participant's id, signal
 probability, clock side, task begin and end.
 }
+\keyword{internal}

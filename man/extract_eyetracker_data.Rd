@@ -9,3 +9,4 @@ extract_eyetracker_data(mat_file)
 \description{
 Extract eyetracker from MAT file
 }
+\keyword{internal}

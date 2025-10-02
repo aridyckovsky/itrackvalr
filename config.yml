@@ -18,6 +18,24 @@ default:
     id_pad_length: 3
     total: 57
     incomplete: 7
+  # Screen configuration for EyeLink 1000 Plus remote mode
+  screen:
+    width_px: 1280           # Screen width in pixels (in CSN)
+    height_px: 1024          # Screen height in pixels
+    width_mm: 338.6          # Physical width in millimeters (typical 20" 4:3 monitor)
+    height_mm: 318.5         # Physical height in millimeters
+    viewing_distance_mm: 650 # Distance from eyes to screen (typical remote mode)
+  # Clock task parameters (from task.m)
+  clock:
+    diameter_ratio: 0.333    # Circle diameter as fraction of smallest screen dimension
+    hand_length_ratio: 0.45  # Hand length as fraction of circle diameter (line 221)
+    increment_deg: 3.41      # Angular increment per movement (line 222)
+    line_width_px: 4         # Line width in pixels (line 226)
+  # Validation and calibration
+  validation:
+    response_window_ms: 8000  # Max time for valid response after signal (task.m line 661)
+    zone_strategy: "average"  # Strategy for zone radius: "average", "maximum", "linear"
+    zone_scaling: 1.0         # Scaling factor for zone radius
 
 # Ari's Macbook System User
 metis:

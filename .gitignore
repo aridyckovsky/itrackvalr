@@ -110,3 +110,28 @@ codegen/
 # Octave session info
 octave-workspace
 .Rproj.user
+
+# renv backup files
+renv.lock.*.old
+renv.lock.*-backup
+renv/**/*.old
+
+# Python virtual environments and tools
+.python-version
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.uv/
+
+# Source PDFs and SPECS kept locally for now
+.pdfs/
+.specs/
+
+# Synthetic data remains local for now
+/synthetic_data/
+/inst/extdata/*
+!/inst/extdata/synthetic/

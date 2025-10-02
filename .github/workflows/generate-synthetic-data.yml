@@ -1,0 +1,74 @@
+name: Generate Synthetic Data
+
+on:
+  workflow_call:
+    outputs:
+      data-generated:
+        description: "Whether synthetic data was generated"
+        value: ${{ jobs.generate-data.outputs.generated }}
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/python/**'
+      - '.github/workflows/generate-synthetic-data.yml'
+
+jobs:
+  generate-data:
+    runs-on: ubuntu-latest
+    outputs:
+      generated: ${{ steps.generate.outputs.generated }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        working-directory: tools/python
+        run: uv sync
+
+      - name: Generate synthetic test data (5 participants, 60 trials)
+        working-directory: tools/python
+        run: |
+          uv run python create_and_test_synthetic_data.py \
+            --num-participants 5 \
+            --output-dir ../../inst/extdata/synthetic \
+            --prefix synthetic \
+            --validate
+
+      - name: Verify synthetic data files exist
+        run: |
+          if [ ! -d "inst/extdata/synthetic" ]; then
+            echo "Error: synthetic data directory not created"
+            exit 1
+          fi
+          
+          file_count=$(ls -1 inst/extdata/synthetic/*.mat 2>/dev/null | wc -l)
+          if [ "$file_count" -ne 5 ]; then
+            echo "Error: Expected 5 .mat files, found $file_count"
+            exit 1
+          fi
+          
+          echo "✓ Successfully generated 5 synthetic .mat files"
+          ls -lh inst/extdata/synthetic/
+
+      - name: Upload synthetic data as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-data
+          path: inst/extdata/synthetic/
+          retention-days: 7
+
+      - name: Set output
+        id: generate
+        run: echo "generated=true" >> $GITHUB_OUTPUT
+

@@ -1,4 +1,14 @@
 source("renv/activate.R")
+
+#### -- Repository Configuration -- ####
+# Include R-universe for polars/tidypolars and other packages
+options(
+  repos = c(
+    CRAN = "https://cloud.r-project.org",
+    "R-multiverse" = "https://community.r-multiverse.org"
+  )
+)
+
 #### -- Consistent File Downloads -- ####
 if(.Platform$OS.type == "windows") {
   options(
@@ -9,9 +19,6 @@ if(.Platform$OS.type == "windows") {
     download.file.method = "libcurl"
   )
 }
-options(
-  repos=c("https://cran.rstudio.com/")
-)
 
 #### -- Factors Are Not Strings -- ####
 options(
@@ -57,6 +64,11 @@ if (interactive()) {
 
 #### -- Dev Tools -- ####
 if (interactive()) {
-  library(fs)
-  library(devtools)
+  # Load dev tools only if installed (graceful degradation)
+  if (requireNamespace("fs", quietly = TRUE)) {
+    suppressPackageStartupMessages(library(fs))
+  }
+  if (requireNamespace("devtools", quietly = TRUE)) {
+    suppressPackageStartupMessages(library(devtools))
+  }
 }

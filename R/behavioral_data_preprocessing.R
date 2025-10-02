@@ -1,7 +1,7 @@
 #' @title Get behavioral metadata for each participant
 #' @description Creates a dataframe composed of each participant's id, signal
 #'   probability, clock side, task begin and end.
-#' @export
+#' @keywords internal
 get_behavioral_metadata <- function(behavioral_data) {
   behavioral_data %>%
     dplyr::select(id, p_signal, clock_side, task_begin, task_end) %>%
@@ -14,7 +14,7 @@ get_behavioral_metadata <- function(behavioral_data) {
 #'   indices, if any, and in turn, the hit times.
 #' Get hit timestamp from a vector of signal times and a vector of response times
 #' @note Use the .interval variable if 8 seconds is not the desired interval
-#' @export
+#' @keywords internal
 get_hit_times <- function(signal_times, response_times, .interval = 8.0) {
 
   # Create vector to hold hit indices
@@ -54,7 +54,7 @@ get_hit_times <- function(signal_times, response_times, .interval = 8.0) {
 #' @title Get all participants' hits given signal presence
 #' @description Creates a dataframe composed of each participant's hit times and
 #'   reaction times for those hits, row-by-row with signal times.
-#' @export
+#' @keywords internal
 get_hits_given_signals <- function(behavioral_data) {
 
   participants <- behavioral_data %>%
@@ -98,7 +98,7 @@ get_hits_given_signals <- function(behavioral_data) {
 
 #' @title Get false alarms given responses for all participants
 #' @description TODO
-#' @export
+#' @keywords internal
 get_false_alarms_given_responses <- function(behavioral_data, hits_with_reaction_times) {
   behavioral_data %>%
     dplyr::filter(is_response == 1) %>%

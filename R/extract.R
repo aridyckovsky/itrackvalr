@@ -5,7 +5,7 @@
 #################################################
 
 #' @title Extract behavioral data from MAT file
-#' @export
+#' @keywords internal
 extract_behavioral_data <- function(data_path, mat_file, id_prefix = "CSN") {
   # Get the padded 3-digit id from the file name, including a prefix
   participant_id <- stringr::str_extract(mat_file, str_c(id_prefix,"\\d{3}"))
@@ -48,7 +48,7 @@ extract_behavioral_data <- function(data_path, mat_file, id_prefix = "CSN") {
 #################################################
 
 #' @title Extract eyetracker from MAT file
-#' @export
+#' @keywords internal
 extract_eyetracker_data <- function(mat_file) {
   mat_data <- readMat(mat_file)
   struct <- mat_data$Edf2Mat
@@ -57,7 +57,7 @@ extract_eyetracker_data <- function(mat_file) {
 }
 
 #' @title Extract recordings data from eyetracker struct
-#' @export
+#' @keywords internal
 extract_recordings_data <- function(struct_data) {
   recordings <- struct_data$RECORDINGS
   recordings_fields <- dimnames(recordings)[[1]]
