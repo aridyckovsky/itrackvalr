@@ -9,3 +9,4 @@ hit_by_signal_time_model(df, random_effects = FALSE)
 \description{
 TODO
 }
+\keyword{internal}

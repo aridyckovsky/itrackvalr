@@ -10,3 +10,4 @@ get_hits_given_signals(behavioral_data)
 Creates a dataframe composed of each participant's hit times and
 reaction times for those hits, row-by-row with signal times.
 }
+\keyword{internal}

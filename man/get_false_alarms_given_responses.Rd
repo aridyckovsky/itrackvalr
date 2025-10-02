@@ -9,3 +9,4 @@ get_false_alarms_given_responses(behavioral_data, hits_with_reaction_times)
 \description{
 TODO
 }
+\keyword{internal}

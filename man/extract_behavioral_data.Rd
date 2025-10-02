@@ -9,3 +9,4 @@ extract_behavioral_data(data_path, mat_file, id_prefix = "CSN")
 \description{
 Extract behavioral data from MAT file
 }
+\keyword{internal}

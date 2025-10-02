@@ -1,0 +1,290 @@
+---
+title: "From .mat to on-task: Complete Eye-Tracking Pipeline"
+author: "Ari Dyckovsky, Peter Sokol-Hessner"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{From .mat to on-task: Complete Eye-Tracking Pipeline}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Overview
+
+This vignette walks through the complete `itrackvalr` pipeline, from ingesting MATLAB `.mat` files through on-task classification. We'll demonstrate both **eager (tibble)** and **lazy (polars LazyFrame)** processing approaches.
+
+## The CSN Study
+
+The Clock-Signal-Noise (CSN) study uses the **EyeLink 1000 Plus** eye tracker in **remote mode**:
+
+- **Tracking**: Monocular right eye, no chinrest
+- **Sampling**: 500-1000 Hz
+- **Remote mode**: Target sticker on forehead for distance measurement[^1]
+- **Lens**: 25mm remote lens (better quality than 16mm standard)
+
+[^1]: EL1000Plus User Manual, Section 3.2. Remote mode uses an infrared-reflective target sticker placed on the participant's forehead for head distance estimation, enabling tracking without a chinrest.
+
+## Step 1: Read .mat File
+
+```{r read_data, eval=FALSE}
+library(itrackvalr)
+
+# Read synthetic participant data
+mat_file <- system.file("extdata/synthetic/synthetic_01.mat", 
+                         package = "itrackvalr")
+data <- read_mat_data(mat_file)
+
+# Inspect structure
+str(data, max.level = 1)
+```
+
+Returns 4 tibbles:
+- **samples**: High-frequency gaze data (30,000 rows)
+- **events**: Discrete occurrences (132 rows)
+- **behavioral**: Trial-level outcomes (60 rows)
+- **metadata**: Session information (1 row)
+
+## Step 2: Parse Validation Messages
+
+```{r validation, eval=FALSE}
+# Extract pre/post calibration metrics
+validation_df <- parse_validation_msgs(data$events)
+
+# View validation errors
+validation_df
+#> id    time  type  avg_err_deg  max_err_deg  offset_x_px  offset_y_px
+#> SYN01 0     pre   0.64         1.28         12.3         8.5
+#> SYN01 61000 post  0.68         1.32         14.1         9.2
+```
+
+## Step 3: Apply Calibration Offsets
+
+### Eager Approach (Small Datasets)
+
+```{r calibration_eager, eval=FALSE}
+# Linear interpolation from pre to post offsets
+samples_calibrated <- apply_calibration_offsets(
+  data$samples,
+  validation_df,
+  method = "linear"
+)
+
+# New columns added:
+# - x_px_adj, y_px_adj: Calibration-corrected coordinates
+# - offset_x_applied, offset_y_applied: Applied offsets
+```
+
+### Lazy Approach (Large Datasets)
+
+```{r calibration_lazy, eval=FALSE}
+# Convert to LazyFrame for efficient processing
+samples_lf <- to_polars_lf(data$samples)
+
+# Apply calibration (remains lazy)
+samples_calibrated_lf <- apply_calibration_offsets(
+  samples_lf,
+  validation_df,
+  method = "linear"
+)
+
+# Data not yet loaded into memory!
+# Stream to Parquet:
+sink_parquet(samples_calibrated_lf, "output/calibrated/samples.parquet")
+```
+
+## Step 4: Resample to Uniform Grid
+
+```{r resample, eval=FALSE}
+# Standardize to 500 Hz with gap detection
+samples_resampled <- resample_samples(
+  samples_calibrated,
+  hz_standard = 500,
+  gap_threshold = 20  # ms
+)
+
+# New columns:
+# - gap_flag: TRUE if interpolated across large gap
+# - blink: TRUE if pupil missing/zero
+```
+
+## Step 5: Compute Clock Hand Dynamics
+
+```{r clock_hand, eval=FALSE}
+# Derive hand tip positions from task parameters
+hand_positions <- derive_hand_dynamics(
+  metadata_df = data$metadata,
+  events_df = data$events,
+  cfg = config::get(),
+  sampling_rate_hz = 500
+)
+
+# Join to gaze samples
+samples_with_hand <- join_hand_positions(
+  samples_resampled,
+  hand_positions
+)
+
+# New columns:
+# - tip_x_px, tip_y_px: Clock hand tip position
+# - angle_deg: Current angle (0 = 12 o'clock)
+# - center_x_px, center_y_px: Clock center
+```
+
+## Step 6: Compute Zone of Uncertainty
+
+```{r zone, eval=FALSE}
+# Calculate acceptable distance threshold from validation errors
+zone_radii <- compute_zone_radius(
+  validation_df,
+  strategy = "average",  # or "maximum", "pre_avg", "post_avg"
+  scaling = 1.0
+)
+
+# Returns per-participant radii (typically 20-50 pixels)
+zone_radii
+#> id    r_deg  r_px   strategy  scaling
+#> SYN01 0.66   23.6   average   1.0
+```
+
+## Step 7: Distance & On-Task Classification
+
+```{r binarize, eval=FALSE}
+# Compute Euclidean distance to hand tip
+samples_with_distance <- compute_distance(
+  samples_with_hand,
+  use_adjusted = TRUE  # Use calibration-corrected coordinates
+)
+
+# Classify as on-task (within zone) or off-task
+samples_binarized <- binarize_on_task(
+  samples_with_distance,
+  zone_radii
+)
+
+# New column:
+# - on_task: TRUE (within zone), FALSE (outside), NA (blink/missing)
+
+# Check overall proportion
+mean(samples_binarized$on_task, na.rm = TRUE)
+#> [1] 0.006  # 0.6% on-task (low for stochastic gaze)
+```
+
+## Step 8: Segment by Trials
+
+```{r segment, eval=FALSE}
+# Slice gaze data by image presentation trials
+trial_segments <- segment_trials(
+  samples_binarized,
+  data$events,
+  data$behavioral
+)
+
+# New columns:
+# - trial: Trial number
+# - t_trial_ms: Time since image onset (0 = onset)
+# - t_absolute: Original timestamp
+# - image_index: Which image was shown
+# - outcome: hit, miss, false_alarm, correct_rejection
+```
+
+## Complete Pipeline Example
+
+### Small Scale (≤10 participants): Eager Processing
+
+```{r pipeline_eager, eval=FALSE}
+# Read and process 5 synthetic participants
+mat_files <- get_mat_files("inst/extdata/synthetic")
+all_data <- read_all_participants(mat_files)
+
+# Aggregate (auto-uses dplyr for small scale)
+all_samples <- aggregate_samples(all_data)  # Returns tibble
+all_validation <- aggregate_validation(all_data)
+all_behavioral <- aggregate_behavioral(all_data)
+all_metadata <- aggregate_metadata(all_data)
+
+# Process eagerly
+validation_summary <- summarize_validation_relationships(all_validation)
+zone_radii <- compute_zone_radius(all_validation, strategy = "average")
+
+samples_processed <- all_samples |>
+  apply_calibration_offsets(all_validation, method = "linear") |>
+  resample_samples(hz_standard = 500)
+
+# Continue with hand dynamics, distance, binarization...
+```
+
+### Large Scale (>10 participants): Lazy Processing
+
+```{r pipeline_lazy, eval=FALSE}
+# Read all 57 participants
+mat_files <- get_mat_files("/Volumes/shlab/Projects/CSN/data")
+all_data <- read_all_participants(mat_files)
+
+# Aggregate (auto-uses polars for large scale)
+all_samples_lf <- aggregate_samples(all_data)  # Returns LazyFrame!
+
+# Process lazily (no data loaded yet)
+samples_processed_lf <- all_samples_lf |>
+  apply_calibration_offsets(all_validation, method = "linear") |>
+  resample_samples(hz_standard = 500) |>
+  # join hand positions, compute distance, binarize...
+
+# Stream to disk without loading into memory
+sink_parquet(
+  samples_processed_lf, 
+  "output/preprocessed/ALL_samples_binarized.parquet"
+)
+
+# Memory usage: <2 GB vs >10 GB with eager approach!
+```
+
+## Using the targets Pipeline
+
+The recommended approach is the `targets` pipeline:
+
+```{r targets_pipeline, eval=FALSE}
+library(targets)
+
+# Run complete pipeline
+tar_make()
+
+# Visualize dependencies
+tar_visnetwork()
+
+# Inspect specific targets
+tar_read(samples_binarized)
+tar_read(cohort_summary)
+```
+
+## Performance Comparison
+
+| Scale | Approach | Time | Memory | Notes |
+|-------|----------|------|--------|-------|
+| 5 participants | dplyr (eager) | 1 min | <3 GB | Fast enough |
+| 57 participants | dplyr (eager) | ~7 min | >10 GB | Memory limited |
+| 57 participants | polars (lazy) | <1 min | <2 GB | **Recommended** |
+
+The package automatically chooses the optimal backend via smart dispatch!
+
+## References
+
+1. [EyeLink 1000 Plus User Manual](https://www.hse.ru/mirror/pubs/share/560338728.pdf)
+2. [tidypolars documentation](https://tidypolars.etiennebacher.com/)
+3. [itrackvalr GitHub](https://github.com/aridyckovsky/itrackvalr)
+
+## Session Info
+
+```{r session_info, eval=FALSE}
+sessionInfo()
+```
+
+

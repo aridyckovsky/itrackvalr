@@ -9,3 +9,4 @@ extract_recordings_data(struct_data)
 \description{
 Extract recordings data from eyetracker struct
 }
+\keyword{internal}
