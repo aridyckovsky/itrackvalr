@@ -11,13 +11,23 @@ name: test-coverage
 permissions: read-all
 
 jobs:
+  generate-data:
+    uses: ./.github/workflows/generate-synthetic-data.yml
+
   test-coverage:
+    needs: generate-data
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download synthetic data
+        uses: actions/download-artifact@v4
+        with:
+          name: synthetic-data
+          path: inst/extdata/synthetic/
 
       - uses: r-lib/actions/setup-r@v2
         with:
