@@ -113,7 +113,7 @@ test_that("summarize_validation_relationships handles single participant", {
 describe("Coordinate conversion functions", {
   
   test_that("deg_to_px() converts visual angle to pixels", {
-    cfg <- get_test_config()
+    cfg <- config::get()
     
     # 1 degree should be approximately 36 pixels for typical remote setup
     px_1deg <- deg_to_px(1.0, cfg)
@@ -124,7 +124,7 @@ describe("Coordinate conversion functions", {
   })
   
   test_that("px_to_deg() converts pixels to visual angle", {
-    cfg <- get_test_config()
+    cfg <- config::get()
     
     # Round-trip conversion should be identity
     original_deg <- 2.5
@@ -135,7 +135,7 @@ describe("Coordinate conversion functions", {
   })
   
   test_that("deg_to_px() and px_to_deg() are inverses", {
-    cfg <- get_test_config()
+    cfg <- config::get()
     
     test_values <- c(0.5, 1.0, 2.0, 5.0)
     
@@ -235,7 +235,7 @@ describe("compute_zone_radius()", {
     mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
     validation_df <- parse_validation_msgs(mat_data$events)
     
-    zone_df <- compute_zone_radius(validation_df, strategy = "average", cfg = get_test_config())
+    zone_df <- compute_zone_radius(validation_df, strategy = "average", cfg = config::get())
     
     expect_equal(nrow(zone_df), 1)
     expect_named(zone_df, c("id", "r_deg", "r_px", "strategy", "scaling"))
@@ -246,7 +246,7 @@ describe("compute_zone_radius()", {
   test_that("compute_zone_radius() scaling factor works", {
     mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
     validation_df <- parse_validation_msgs(mat_data$events)
-    cfg <- get_test_config()
+    cfg <- config::get()
     
     zone_1x <- compute_zone_radius(validation_df, strategy = "average", scaling = 1.0, cfg = cfg)
     zone_2x <- compute_zone_radius(validation_df, strategy = "average", scaling = 2.0, cfg = cfg)
@@ -258,7 +258,7 @@ describe("compute_zone_radius()", {
   test_that("compute_zone_radius() errors on negative scaling", {
     mat_data <- read_mat_data(get_synthetic_file("synthetic_01.mat"))
     validation_df <- parse_validation_msgs(mat_data$events)
-    cfg <- get_test_config()
+    cfg <- config::get()
     
     expect_error(
       compute_zone_radius(validation_df, scaling = -0.5, cfg = cfg),
