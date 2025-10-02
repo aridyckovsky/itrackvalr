@@ -88,6 +88,10 @@ format_bytes <- function(bytes) {
 }
 
 #' Export samples data with metadata
+#' @param samples Samples tibble
+#' @param metadata Metadata tibble
+#' @param stage Pipeline stage name
+#' @param base_dir Base output directory
 #' @export
 export_samples <- function(samples, metadata, stage, base_dir = "output") {
   # Add metadata columns to samples for context
@@ -112,6 +116,10 @@ export_samples <- function(samples, metadata, stage, base_dir = "output") {
 }
 
 #' Export events data with metadata
+#' @param events Events tibble
+#' @param metadata Metadata tibble
+#' @param stage Pipeline stage name
+#' @param base_dir Base output directory
 #' @export
 export_events <- function(events, metadata, stage, base_dir = "output") {
   # Add session metadata
@@ -135,6 +143,9 @@ export_events <- function(events, metadata, stage, base_dir = "output") {
 }
 
 #' Export validation summaries
+#' @param validation_df Validation data tibble
+#' @param validation_summary Validation summary list
+#' @param base_dir Base output directory
 #' @export
 export_validation <- function(validation_df, validation_summary, base_dir = "output") {
   
@@ -196,6 +207,7 @@ export_validation <- function(validation_df, validation_summary, base_dir = "out
 #' @description
 #' Creates a manifest file listing all exported data files with metadata
 #' 
+#' @param base_dir Base output directory
 #' @export
 create_export_manifest <- function(base_dir = "output") {
   

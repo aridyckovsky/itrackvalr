@@ -353,8 +353,8 @@ parse_calibration_fields <- function(events) {
       events$max_err_deg[i] <- as.numeric(max_match[1,2])
     }
     
-    # Extract offset (x,y) in pixels
-    offset_match <- stringr::str_match(msg, "offset=\\(([0-9.]+),([0-9.]+)\\)")
+    # Extract offset (x,y) in pixels (handles negative values)
+    offset_match <- stringr::str_match(msg, "offset=\\(([+-]?[0-9.]+),([+-]?[0-9.]+)\\)")
     if (!is.na(offset_match[1,1])) {
       events$offset_x_px[i] <- as.numeric(offset_match[1,2])
       events$offset_y_px[i] <- as.numeric(offset_match[1,3])

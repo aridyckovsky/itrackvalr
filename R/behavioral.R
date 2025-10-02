@@ -5,7 +5,7 @@
 #' trial containing all behavioral information: signals, responses, images, etc.
 #' This is distinct from the events stream and is needed for behavioral analyses.
 #'
-#' @param subjdata The subjdata structure from .mat file (after [,,1] extraction)
+#' @param subjdata The subjdata structure from .mat file (after array extraction)
 #' @param participant_id Participant identifier
 #'
 #' @return A tibble with one row per trial containing:

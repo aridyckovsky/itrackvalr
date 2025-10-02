@@ -5,7 +5,7 @@
 #################################################
 
 #' @title Clean extracted behavioral data
-#' @export
+#' @keywords internal
 clean_behavioral_data <- function(csv_file, id_prefix = "CSN") {
   # Get the padded 3-digit id from the file name, including a prefix
   padded_id <- stringr::str_extract(csv_file, str_c(id_prefix,"\\d{3}"))
