@@ -17,13 +17,13 @@ Description: Processes and analyzes eye-tracking data from EyeLink 1000 Plus
     applies calibration offsets, computes zone-of-uncertainty metrics,
     binarizes gaze into on/off-task indicators, and performs model-free
     and model-based analyses with behavioral integration.
-License: MIT + file LICENSE.md
-URL: https://github.com/aridyckovsky/itrackvalr
-BugReports: https://github.com/aridyckovsky/itrackvalr/issues
+License: MIT + file LICENSE
+URL: https://github.com/sokolhessnerlab/itrackvalr
+BugReports: https://github.com/sokolhessnerlab/itrackvalr/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Depends: 
     R (>= 4.5.0)
 Imports:
@@ -48,15 +48,23 @@ Imports:
     tidyr
 Suggests:
     arrow,
+    bench,
+    blob,
     covr,
+    devtools,
     eyetrackingR,
     ggpubr,
     glmmTMB,
     knitr,
     pkgdown,
+    polars,
+    purrr,
     rmarkdown,
+    roxygen2,
     saccadr,
     testthat (>= 3.0.0),
+    tidypolars,
+    usethis,
     vdiffr
 VignetteBuilder: knitr
 Config/testthat/edition: 3

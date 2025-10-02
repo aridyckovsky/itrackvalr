@@ -133,3 +133,5 @@ env/
 
 # Synthetic data remains local for now
 /synthetic_data/
+/inst/extdata/*
+!/inst/extdata/synthetic/
